@@ -31,7 +31,46 @@ static int match_ci(const char *dir, const char *name, char *out, size_t n) {
     return found;
 }
 
+/* Enhanced Edition mod folder (EE Common/FileSystemHooks.cpp): data/X is read from sh2e/X when that
+ * file exists. Each top-level folder is switched on separately in sh2e.ini ("pic=1", "movie=1", ...),
+ * because some EE packs only work with EE patches the port does not have yet. */
+static int sh2e_enabled(const char *rel) {  /* rel: path after "data/" */
+    static char on[32][16];
+    static int n_on = -1;
+    if (n_on < 0) {
+        n_on = 0;
+        FILE *f = fopen("sh2e.ini", "r");
+        char line[128], key[16];
+        int v;
+        while (f && fgets(line, sizeof line, f))
+            if (sscanf(line, " %15[^= ] = %d", key, &v) == 2 && v && n_on < 32) snprintf(on[n_on++], 16, "%s", key);
+        if (f) fclose(f);
+        if (n_on) rt_log("sh2e: %d mod folders enabled", n_on);
+    }
+    size_t cl = strcspn(rel, "/");
+    for (int i = 0; i < n_on; i++)
+        if (strlen(on[i]) == cl && !strncasecmp(on[i], rel, cl)) return 1;
+    return 0;
+}
+
+static const char *rt_path_base(const char *guest, char *out, size_t n);
+
 const char *rt_path(const char *guest, char *out, size_t n) {
+    const char *r = rt_path_base(guest, out, n);
+    if (!strncasecmp(r, "data/", 5) && sh2e_enabled(r + 5)) {
+        char alt[512], res[512];
+        struct stat st;
+        snprintf(alt, sizeof alt, "sh2e/%s", r + 5);
+        rt_path_base(alt, res, sizeof res);
+        if (stat(res, &st) == 0 && S_ISREG(st.st_mode)) {
+            if (rt_trace) rt_log("  sh2e: %s", res);
+            snprintf(out, n, "%s", res);
+        }
+    }
+    return out;
+}
+
+static const char *rt_path_base(const char *guest, char *out, size_t n) {
     char tmp[512];
     snprintf(tmp, sizeof tmp, "%s", guest);
     for (char *c = tmp; *c; c++) if (*c == '\\') *c = '/';

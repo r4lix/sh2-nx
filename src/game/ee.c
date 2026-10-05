@@ -82,6 +82,59 @@ void sub_004015D0(void) {
     g_esp += 4;
 }
 
+/* ---- TexPatch (EE Patches/TexPatch.cpp, EnableTexAddrHack) ----
+ * Texture files are read into load buffers sized for the original game; the EE HD textures are much
+ * larger. tools/patch_exe.py points the game at these guest buffers instead. */
+#define TEX_BUF1 0x04000000u
+#define TEX_BUF2 0x06B00000u
+#define TEX_BUF3 0x09600000u
+#define TEX_SIZE 44760576u   /* 2 x 22,380,640 bytes, rounded to 4 KB; buffer 3 is twice that */
+
+/* The file read at 0x449FD7 (0x4494A0) gets the load buffer as its second argument; EE reads the same
+ * value from ebp at 0x44A00D, but ebp is a local of the lifted caller, so it is remembered here. */
+static uint32_t tex_load_buffer;
+extern void sub_004494A0_gen(void);
+void sub_004494A0(void) {
+    tex_load_buffer = MEM32(g_esp + 8);
+    sub_004494A0_gen();
+}
+
+/* Cave 0x401970, called from 0x44A00D in place of the texture loader 0x448810: EE's TexBufferASM,
+ * which clears the buffer the texture was read into once the loader is done with it. */
+void sub_00401970(void) {
+    rt_resolve(0x00448810u)();  /* same stack and return address: it returns for us */
+    uint32_t at = tex_load_buffer;
+    if (at == TEX_BUF1 || at == TEX_BUF2) memset(GPTR(at), 0, TEX_SIZE);
+    else if (at == TEX_BUF3) memset(GPTR(at), 0, 2 * TEX_SIZE);
+}
+
+#include "../runtime/host.h"
+/* Called once after sh2pc.exe is loaded. */
+void ee_init(void) {
+    host_arena_commit(TEX_BUF1, TEX_BUF3 + 2 * TEX_SIZE - TEX_BUF1);
+    /* The game writes SET DX_CONFIG_SAFE_MODE 1 at start and removes it on a clean exit; anything else
+     * means "it crashed", and the next start falls back to 640x480 safe graphics. On the Switch the
+     * normal way out is HOME, so the flag is dropped before the game reads it. */
+    FILE *f = fopen("settings.ini", "rb");
+    if (f) {
+        char buf[4096], out[4096];
+        size_t n = fread(buf, 1, sizeof buf - 1, f), o = 0;
+        fclose(f);
+        buf[n] = 0;
+        for (char *line = strtok(buf, "\n"); line; line = strtok(NULL, "\n"))
+            if (!strstr(line, "DX_CONFIG_SAFE_MODE")) o += snprintf(out + o, sizeof out - o, "%s\n", line);
+        if ((f = fopen("settings.ini", "wb"))) { fwrite(out, 1, o, f); fclose(f); }
+    }
+    rt_log("ee: texture buffers at %08X/%08X/%08X", TEX_BUF1, TEX_BUF2, TEX_BUF3);
+}
+
+/* DrawCursor (called once, from 0x476128): the knife mouse pointer. The Switch has no mouse, so it is
+ * never drawn (EE InputTweaks' DrawCursor_Hook with HideMouseCursor). */
+extern void sub_0045A6D0_gen(void);
+void sub_0045A6D0(void) {
+    g_esp += 4;
+}
+
 /* ---- vibration (EE Wrappers/dinput8/IDirectInputEffect.cpp, RestoreVibration) ---- */
 
 /* CreateDirectInputGamepad: a pad that created an effect is driven as a rumble pad (type 2). */
@@ -106,6 +159,9 @@ recomp_func_t ee_lookup_manual(uint32_t va) {
     case 0x00458060u: return sub_00458060;
     case 0x00534660u: return sub_00534660;
     case 0x00458760u: return sub_00458760;
+    case 0x0045A6D0u: return sub_0045A6D0;
+    case 0x00401970u: return sub_00401970;
+    case 0x004494A0u: return sub_004494A0;
     case 0x00401460u: return sub_00401460;
     case 0x004015D0u: return sub_004015D0;
     }

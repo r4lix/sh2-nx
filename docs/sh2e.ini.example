@@ -1,0 +1,10 @@
+; Enhanced Edition packs: data/<folder>/X is read from sh2e/<folder>/X when it exists
+pic=0
+menu=0
+bg=1
+bg2=1
+chr=1
+font=1
+etc=1
+movie=0
+sound=0

@@ -428,6 +428,7 @@ static uint32_t load_exe(const char *path) {
 }
 
 extern void xbe_entry_point(void);
+void ee_init(void);  /* src/game/ee.c */
 
 /* The game runs on a thread of its own: lifted code recurses as deep as the guest and the main
  * thread's stack is not ours to size on every platform. */
@@ -458,6 +459,7 @@ int main(int argc, char **argv) {
     arena_init();
     recomp_dispatch_init();
     load_exe("sh2pc.exe");
+    ee_init();
     host_thread_start(game_thread, NULL, 16u << 20);
     for (;;) sleep(1000);
 }
