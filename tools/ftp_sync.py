@@ -1,91 +1,67 @@
 #!/usr/bin/env python3
-"""Uploads files to the Switch over FTP (sys-ftpd), skipping ones already there with the same size.
+"""Uploads files to the Switch over FTP (sys-ftpd) with curl, skipping ones already there with the same size.
+
+sys-ftpd crashes (taking an Atmosphere crash screen with it) on commands it does not implement, such
+as MLSD or MKD of an existing directory, so this only drives curl, whose LIST/CWD/STOR sequence is
+known to work: one curl per directory, files sent over one connection, directories created only when
+CWD fails (--ftp-create-dirs).
 
 Usage: ftp_sync.py <local file or dir> <remote dir> [...pairs]
-       e.g. ftp_sync.py ../original-dc/data /switch/sh2-nx/data build/switch/sh2-nx.nro /switch/sh2-nx
 """
-import ftplib, os, sys, time
+import os, subprocess, sys, time
 
 HOST = os.environ.get('SWITCH_IP', '172.31.99.188')
 PORT = int(os.environ.get('SWITCH_FTP_PORT', '5000'))
+URL = f'ftp://{HOST}:{PORT}'
 
 
-def connect():
-    f = ftplib.FTP()
-    f.connect(HOST, PORT, timeout=60)
-    f.login()
-    f.set_pasv(True)
-    return f
-
-
-def remote_sizes(f, d):
+def remote_sizes(d):
+    r = subprocess.run(['curl', '-s', '--max-time', '60', f'{URL}{d}/'], capture_output=True, text=True)
     out = {}
-    try:
-        for name, facts in f.mlsd(d, facts=['size', 'type']):
-            out[name] = int(facts.get('size', -1)) if facts.get('type') == 'file' else -2
-    except ftplib.all_errors:
-        try:
-            lines = []
-            f.retrlines(f'LIST {d}', lines.append)
-            for l in lines:
-                p = l.split(None, 8)
-                if len(p) == 9:
-                    out[p[8]] = -2 if l.startswith('d') else int(p[4])
-        except ftplib.all_errors:
-            pass
+    for l in r.stdout.splitlines():
+        p = l.split(None, 8)
+        if len(p) == 9:
+            out[p[8]] = -2 if l.startswith('d') else int(p[4])
     return out
 
 
-def mkdirs(f, d, known):
-    parts = d.strip('/').split('/')
-    for i in range(1, len(parts) + 1):
-        p = '/' + '/'.join(parts[:i])
-        if p in known:
-            continue
-        try:
-            f.cwd(p)          # sys-ftpd drops the connection on MKD of an existing directory
-        except ftplib.error_perm:
-            f.mkd(p)
-        known.add(p)
-    f.cwd('/')
-
-
-def upload(f, local, remote_dir, state):
-    files = []
-    if os.path.isdir(local):
-        for dp, _, fs in os.walk(local):
-            for n in fs:
-                src = os.path.join(dp, n)
-                rel = os.path.relpath(dp, local).replace('\\', '/')
-                files.append((src, remote_dir if rel == '.' else f'{remote_dir}/{rel}'))
-    else:
-        files.append((local, remote_dir))
-    for src, rd in files:
-        if rd not in state['listed']:
-            mkdirs(f, rd, state['dirs'])
-            state['listed'][rd] = remote_sizes(f, rd)
-        name, size = os.path.basename(src), os.path.getsize(src)
-        if state['listed'][rd].get(name) == size:
-            continue
-        with open(src, 'rb') as fh:
-            f.storbinary(f'STOR {rd}/{name}', fh, blocksize=1 << 20)
-        state['bytes'] += size
-        state['n'] += 1
-        print(f'{state["n"]:5} {state["bytes"] >> 20:6} MB  {rd}/{name}', flush=True)
+def upload_dir_batch(rd, files):
+    """files: local paths, all going to remote dir rd."""
+    have = remote_sizes(rd)
+    todo = [f for f in files if have.get(os.path.basename(f)) != os.path.getsize(f)]
+    for i in range(0, len(todo), 40):
+        chunk = todo[i:i + 40]
+        for attempt in range(3):
+            args = ['curl', '-s', '-S', '--ftp-create-dirs', '--retry', '2']
+            for f in chunk:
+                args += ['-T', f, f'{URL}{rd}/{os.path.basename(f)}']
+            r = subprocess.run(args, capture_output=True, text=True)
+            if r.returncode == 0:
+                break
+            print(f'  retry {rd}: {r.stderr.strip()}', flush=True)
+            time.sleep(5)
+        else:
+            sys.exit(f'upload to {rd} failed')
+    return todo
 
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    t0 = time.time()
-    for attempt in range(5):
-        state = {'listed': {}, 'dirs': set(), 'bytes': 0, 'n': 0}
-        try:
-            f = connect()
-            for i in range(0, len(args), 2):
-                upload(f, args[i], args[i + 1].rstrip('/'), state)
-            f.quit()
-            break
-        except ftplib.all_errors + (EOFError,) as e:
-            print(f'connection lost ({e}); retrying', flush=True)
-            time.sleep(5)
-    print(f'done in {time.time() - t0:.0f}s', flush=True)
+    t0, total, n = time.time(), 0, 0
+    groups = {}
+    for i in range(0, len(args), 2):
+        local, rd = args[i], args[i + 1].rstrip('/')
+        if os.path.isdir(local):
+            for dp, _, fs in os.walk(local):
+                rel = os.path.relpath(dp, local).replace('\\', '/')
+                key = rd if rel == '.' else f'{rd}/{rel}'
+                groups.setdefault(key, []).extend(os.path.join(dp, f) for f in sorted(fs))
+        else:
+            groups.setdefault(rd, []).append(local)
+    for rd in sorted(groups):
+        sent = upload_dir_batch(rd, groups[rd])
+        n += len(sent)
+        total += sum(os.path.getsize(f) for f in sent)
+        if sent:
+            print(f'{n:5} files {total >> 20:6} MB  {rd}', flush=True)
+    print(f'done in {time.time() - t0:.0f}s: {n} files, {total >> 20} MB', flush=True)

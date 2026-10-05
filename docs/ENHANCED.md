@@ -55,3 +55,18 @@ PauseScreenFix.
   now appended to `sh2-progs.bin` (shaders identified by a hash of their GLSL) and rebuilt at the
   next start: fixed-function ones before the first draw, shader ones once the game created them.
 - **Pause background not frozen in some rooms**: needs hardware testing.
+
+## Status 2026-10-05 and next steps (EE assets)
+
+- Director's Cut boots on hardware (title menu reached). Main-menu images are English/Japanese only in
+  DC data (pic/etc/start00/01); French text is in-game. Mouse cursor (knife) is drawn: report no mouse.
+- EE file redirection (EE Common/FileSystemHooks.cpp): `data/X` is loaded from `sh2e/X` when it exists
+  (end.bik/ending.bik and start01 need start00 special cases). To do in `rt_path` with per-folder switches.
+- sh2e sizes: movie 4.9 GB, sound 4.0 GB, pic 1.9 GB (281 files, 56 over 16 MB = 1.1 GB, up to 21 MB
+  e.g. pic/map/*.tex), bg 117 MB, menu 11 MB, font 16 MB.
+- HD textures need EE PatchTexAddr (TexPatch.cpp): texture load buffers at 0x401CC1 / 0x44B99D /
+  0x496F87 / 0x49B40A (+ UFO 0x57E84E-0x28, 0x58C31E-0x28) moved to larger buffers. Port plan: reserve
+  fixed guest VAs for the buffers, patch the immediates in tools/patch_exe.py, clear hook as an ee.c cave.
+- Audio pack needs EE PatchCriware/SfxPatch (BGM size tables) before sh2e/sound can be used.
+- sys-ftpd moved to port 5002 (config.ini.bak kept); sphaira FTP on 5000 is faster. Use curl only
+  (tools/ftp_sync.py): sys-ftpd crashes on MLSD and on MKD of an existing directory.

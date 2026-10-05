@@ -18,7 +18,14 @@ def token():
     t = os.environ.get('SWREMOTE_TOKEN')
     if t:
         return t
-    ini = urllib.request.urlopen(f'ftp://{HOST}:5000/config/sys-remote/config.ini', timeout=15).read().decode()
+    for port in (os.environ.get('SWITCH_FTP_PORT', '5000'), '5002', '5000'):
+        try:
+            ini = urllib.request.urlopen(f'ftp://{HOST}:{port}/config/sys-remote/config.ini', timeout=15).read().decode()
+            break
+        except OSError:
+            continue
+    else:
+        sys.exit('no FTP server to read the sys-remote token from')
     for line in ini.splitlines():
         if line.strip().startswith('token='):
             return line.split('=', 1)[1].strip()
