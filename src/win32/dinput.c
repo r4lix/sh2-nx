@@ -302,8 +302,16 @@ static int32_t pad_axis(SDL_GameController *c, uint32_t dev, int i) {
 }
 
 static int pad_button(SDL_GameController *c, int i) {
+    /* SDL names the face buttons by position (Xbox layout: A bottom, B right, X left, Y top). With the
+     * Enhanced Edition keyconf.dat that puts confirm on the right button, cancel on the left and run on
+     * the bottom. On the Switch, cancel belongs on B (bottom): bottom and left trade places, giving
+     * A confirm, B cancel, Y run, X map. */
     static const SDL_GameControllerButton bt[10] = {
+#ifdef __SWITCH__
+        SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_A, SDL_CONTROLLER_BUTTON_Y,
+#else
         SDL_CONTROLLER_BUTTON_A, SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y,
+#endif
         SDL_CONTROLLER_BUTTON_LEFTSHOULDER, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, SDL_CONTROLLER_BUTTON_BACK,
         SDL_CONTROLLER_BUTTON_START, SDL_CONTROLLER_BUTTON_LEFTSTICK, SDL_CONTROLLER_BUTTON_RIGHTSTICK};
     if (!c || i >= 12) return 0;
