@@ -1,5 +1,6 @@
 .venv/
 build/
-game
+/game
 src/recomp/gen/
 __pycache__/
+build-switch.log

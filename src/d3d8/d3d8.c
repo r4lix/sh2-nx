@@ -279,7 +279,10 @@ METHOD(dev_SetCursorPosition, 4) { return 0; }
 METHOD(dev_ShowCursor, 2) { return 0; }
 METHOD(dev_Reset, 2) { device_reset(ARG(1)); return 0; }
 
+void ee_frame(void);  /* src/game/ee.c: per-frame Enhanced Edition logic */
+
 METHOD(dev_Present, 5) {
+    ee_frame();
     int ww, wh;
     SDL_GL_GetDrawableSize(rt_window, &ww, &wh);
     Res *bb = res_of(dev->backbuffer);

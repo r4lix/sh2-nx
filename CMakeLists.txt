@@ -6,7 +6,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 file(GLOB GEN CONFIGURE_DEPENDS src/recomp/gen/*.c)
-file(GLOB RT CONFIGURE_DEPENDS src/runtime/*.c src/win32/*.c src/d3d8/*.c)
+file(GLOB RT CONFIGURE_DEPENDS src/runtime/*.c src/win32/*.c src/d3d8/*.c src/game/*.c)
 
 add_executable(sh2 ${GEN} ${RT})
 target_include_directories(sh2 PRIVATE src/recomp/gen)

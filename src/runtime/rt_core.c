@@ -287,7 +287,9 @@ recomp_func_t recomp_lookup_kernel(uint32_t va) {
 }
 
 /* Hand-written replacements of game functions, by guest address. None yet. */
-recomp_func_t recomp_lookup_manual(uint32_t va) { (void)va; return NULL; }
+/* Hand-written functions and wrappers (src/game/ee.c): calls to them are routed here first. */
+recomp_func_t ee_lookup_manual(uint32_t va);
+recomp_func_t recomp_lookup_manual(uint32_t va) { return ee_lookup_manual(va); }
 
 recomp_func_t rt_resolve(uint32_t va) {
     recomp_func_t fn = recomp_lookup_manual(va);
