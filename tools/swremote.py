@@ -18,6 +18,9 @@ def token():
     t = os.environ.get('SWREMOTE_TOKEN')
     if t:
         return t
+    cache = os.path.join(os.path.dirname(__file__), '..', 'build', '.swtoken')
+    if os.path.exists(cache) and open(cache).read().strip():
+        return open(cache).read().strip()
     for port in (os.environ.get('SWITCH_FTP_PORT', '5000'), '5002', '5000'):
         try:
             ini = urllib.request.urlopen(f'ftp://{HOST}:{port}/config/sys-remote/config.ini', timeout=15).read().decode()

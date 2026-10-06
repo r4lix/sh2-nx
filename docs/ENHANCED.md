@@ -70,3 +70,37 @@ PauseScreenFix.
 - Audio pack needs EE PatchCriware/SfxPatch (BGM size tables) before sh2e/sound can be used.
 - sys-ftpd moved to port 5002 (config.ini.bak kept); sphaira FTP on 5000 is faster. Use curl only
   (tools/ftp_sync.py): sys-ftpd crashes on MLSD and on MKD of an existing directory.
+
+## Status 2026-10-05 (evening): audio pack, widescreen
+
+- **SFX bank** (EE SfxPatch): the sound bank buffer moved to guest memory (`SFX_BUF`, `tools/patch_exe.py`), and
+  `ee_sfx_init` re-indexes the effect table at 0x8A67DC to the RIFF positions of `sh2e/sound/sddata.bin`.
+  The game's own CRI streaming plays the pack's `.adx/.aix/.afs` unchanged (EE's CriWare reimplementation is a
+  stability fix, not needed). `sound=1` in `sh2e.ini`.
+- **Widescreen** (ThirteenAG's WidescreenFix, Fix2D part): `tools/ws_patches.py` moves ~330 operands to guest
+  variables and calls nine text caves (`ee.c`, `ws_text_*` at 0x4011C0). `resolution=WxH` in `sh2e.ini`
+  (default 1280x720; 1920x1080 docked; 960x720 is the original 4:3). Cutscene letterbox is hidden when wide.
+  Not ported: mouse hitbox/cursor patches, EE's fullscreen image stretching (images stay 4:3, centred).
+- **Heap quarantine** (`rt_core.c`): the 1280x720 crash was a use-after-free in the game that the immediate
+  LIFO reuse of freed blocks exposed (the screen-sized image surface and the Konami logo texture shared a
+  size class). Freed blocks now wait in a 64 MB quarantine with their contents intact.
+- Debugging aids in `sh2e.ini`: `wsN=value` overrides widescreen variable N (see `ee_widescreen_init`),
+  `trace=1` logs every bridged call.
+- **"Des dossiers sont endommagés"**: a `Folder 01` save written earlier the same day (by a different exe build) was
+  rejected by the v1.0 exe's content check after `sh2pc.sys` is read; removing it gives a normal new-game flow.
+  A fresh save round trip (save, quit, reload) with the current build is still to be tested. `FindFirstFile` now
+  returns real file times (were zeros); with `trace=1` file searches are logged.
+- **Save "damaged folders" root cause (fixed in 0.2.2)**: the game reads `sh2pc.sys` with ReadFile, then reads again at EOF
+  and expects 0 bytes with its buffer untouched. Calling `fread` for more bytes than remain zeroed the first 2048
+  bytes of the destination buffer on Horizon, so the checksum failed. `file_io` (kernel32.c) now never reads more than
+  the file holds. `FileTimeToLocalFileTime` now applies the UTC offset (the game stamps saves with local time).
+  Save activity is logged to sh2.log (`save:` lines); `save: fn ...` lines log the save module's return values.
+- Guest threads run on one core by default (`cores=3` in sh2e.ini to spread them) against the CRI audio looping bug.
+- **Grey screens (0.2.3)**: `GetFrontBuffer` read the *back buffer*, which the game had already cleared to grey (70,70,70)
+  for the next frame, so the transition cross-fade and the save thumbnail were uniform grey. Present now keeps a copy
+  of each presented frame (`res_snapshot_front`, d3d8_res.c) and GetFrontBuffer returns that. The capture function is
+  FUN_00477020 (called from 0x479390); `front buffer:` lines in sh2.log show the average colour of each capture.
+- **Map screen (0.2.4)**: the EE HD map pages (`sh2e/pic/map`, `pic/add/map*`) need EE's FullscreenImages map code (MapWidthASM,
+  MapXPosASM, map icon scaling), which is not ported: with them the map drew 160 px too far right and cropped. By default
+  those pages now come from the original `data/pic/map` (the layout WidescreenFix was written for); `hdmaps=1` in sh2e.ini
+  opts back in to the HD pages. Everything else in `pic` stays HD.

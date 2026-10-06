@@ -4,3 +4,7 @@ build/
 src/recomp/gen/
 __pycache__/
 build-switch.log
+dist/
+*.nro
+sh2-progs.bin
+icon.jpg.bak

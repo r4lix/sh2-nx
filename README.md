@@ -94,4 +94,8 @@ album: applet mode does not give homebrew enough memory. Settings and saves are 
 [xboxrecomp](https://github.com/sp00nznet/xboxrecomp); nfsmw-nx, the Need for Speed: Most Wanted Switch
 port, for the Horizon guest-memory technique; devkitPro and libnx, SDL2, FFmpeg, Mesa.
 
+The Enhanced Edition support ports patches from [Silent Hill 2 Enhancements](https://github.com/elishacloud/Silent-Hill-2-Enhancements)
+(Elisha Riedlinger and contributors, zlib licence) and the widescreen fix in it, ThirteenAG's
+[WidescreenFixesPack](https://github.com/ThirteenAG/WidescreenFixesPack) (MIT). `docs/ENHANCED.md` has the details.
+
 Silent Hill is a trademark of Konami. This project is not affiliated with Konami.
