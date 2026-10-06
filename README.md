@@ -1,6 +1,6 @@
 # sh2-nx
 
-Silent Hill 2 (PC, Director's Cut / Restless Dreams) running natively on the Nintendo Switch.
+Silent Hill 2 Enhanced Edition running natively on the Nintendo Switch thanks to the work of [cutarev](https://github.com/cutarev/sh2-nx)
 
 This is not an emulator. The game's x86 executable is statically recompiled to C ahead of time, and
 the C is compiled for the Switch's ARM64 CPU. The Windows layer the game expects is reimplemented on
@@ -90,6 +90,9 @@ album: applet mode does not give homebrew enough memory. Settings and saves are 
 `tools/fuzz.py` checks the lifter's instruction semantics against Unicorn.
 
 ## Credits
+
+[cutarev](https://github.com/cutarev/sh2-nx) 
+
 
 [xboxrecomp](https://github.com/sp00nznet/xboxrecomp); nfsmw-nx, the Need for Speed: Most Wanted Switch
 port, for the Horizon guest-memory technique; devkitPro and libnx, SDL2, FFmpeg, Mesa.
